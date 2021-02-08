@@ -75,7 +75,22 @@ def numjacobian(inputarray):
     # Output array is of format [nx,ny,3,3]
     #  :,:,component, derivativedirection
     # so dAx/dx = :,:,0,0
-    #    DAy/dz = :,:,1,2
+    #    dAy/dz = :,:,1,2
+    return jac
+
+def numjacobian3d(inputarray):
+    # Assumes input array is of format [nx,ny,nz,3]
+    nx,ny,nz = inputarray[:,:,:,0].shape
+    jac = np.zeros([nx,ny,nz,3,3])
+
+    jac[:,:,:,0,0], jac[:,:,:,0,1], jac[:,:,:,0,2] = np.gradient(inputarray[:,:,:,0], CELLSIZE)
+    jac[:,:,:,1,0], jac[:,:,:,1,1], jac[:,:,:,1,2] = np.gradient(inputarray[:,:,:,1], CELLSIZE)
+    jac[:,:,:,2,0], jac[:,:,:,2,1], jac[:,:,:,2,2] = np.gradient(inputarray[:,:,:,2], CELLSIZE)
+    
+    # Output array is of format [nx,ny,nz,3,3]
+    #  :,:,:,component, derivativedirection
+    # so dAx/dx = :,:,:,0,0
+    #    DAy/dz = :,:,:,1,2
     return jac
 
 def numgradscalar(inputarray):
@@ -90,6 +105,14 @@ def numgradscalar(inputarray):
         print("Error defining plane!")
         return -1
     # Output array is of format [nx,ny,3]
+    return grad
+
+def numgradscalar3d(inputarray):
+    # Assumes input array is of format [nx,ny,nz]
+    nx,ny,nz = inputarray.shape
+    grad = np.ma.zeros([nx,ny,nz,3])
+    grad[:,:,0],grad[:,:,1],grad[:,:,2] = np.gradient(inputarray, CELLSIZE)
+    # Output array is of format [nx,ny,nz,3]
     return grad
 
 def expandMask(inputarray):
@@ -112,11 +135,57 @@ def expandMask(inputarray):
             inputarray.mask[:,:,i] = 1.*newmask
     return inputarray
 
+def expandMask3d(inputarray):
+    mask = 1.*inputarray.mask
+    if np.ndim(mask) == 4:
+        mask = 1.*mask.any(axis=3)
+    newmask = 1.*mask
+    newmask = np.logical_or(np.roll(mask,1,axis=0),newmask)
+    newmask = np.logical_or(np.roll(mask,-1,axis=0),newmask)
+    newmask = np.logical_or(np.roll(mask,1,axis=1),newmask)
+    newmask = np.logical_or(np.roll(mask,-1,axis=1),newmask)
+    newmask = np.logical_or(np.roll(mask,1,axis=2),newmask)
+    newmask = np.logical_or(np.roll(mask,-1,axis=2),newmask)
+    newmask = np.logical_or(np.roll(mask,(1,1),axis=(0,1)),newmask)
+    newmask = np.logical_or(np.roll(mask,(1,-1),axis=(0,1)),newmask)
+    newmask = np.logical_or(np.roll(mask,(-1,1),axis=(0,1)),newmask)
+    newmask = np.logical_or(np.roll(mask,(-1,-1),axis=(0,1)),newmask)
+
+    newmask = np.logical_or(np.roll(mask,(1,1),axis=(0,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(1,-1),axis=(0,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(-1,1),axis=(0,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(-1,-1),axis=(0,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(1,1),axis=(1,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(1,-1),axis=(1,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(-1,1),axis=(1,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(-1,-1),axis=(1,2)),newmask)
+
+    newmask = np.logical_or(np.roll(mask,(1,1,1),axis=(0,1,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(1,1-1),axis=(0,1,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(1,-1,1),axis=(0,1,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(1,-1,-1),axis=(0,1,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(-1,1,1),axis=(0,1,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(-1,1,-1),axis=(0,1,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(-1,-1,1),axis=(0,1,2)),newmask)
+    newmask = np.logical_or(np.roll(mask,(-1,-1,-1),axis=(0,1,2)),newmask)
+    if np.ndim(inputarray) == 3:
+        inputarray.mask = 1.*newmask 
+    else:
+        for i in range(3):
+            inputarray.mask[:,:,:,i] = 1.*newmask
+    return inputarray
+
 def numdiv(inputarray):
     # Assumes input array is of format [nx,ny,3]
     jac = numjacobian(inputarray)
     # Output array is of format [nx,ny]
     return jac[:,:,0,0] + jac[:,:,1,1] + jac[:,:,2,2]
+
+def numdiv3d(inputarray):
+    # Assumes input array is of format [nx,ny,nz,3]
+    jac = numjacobian3d(inputarray)
+    # Output array is of format [nx,ny,nz]
+    return jac[:,:,:,0,0] + jac[:,:,:,1,1] + jac[:,:,:,2,2]
 
 def numdivtensor(inputtensor):
     # Assumes input tensor is of format [nx,ny,3,3]
@@ -126,10 +195,24 @@ def numdivtensor(inputtensor):
     result[:,:,2] = numdiv(inputtensor[:,:,2,:])
     return result
 
+def numdivtensor3d(inputtensor):
+    # Assumes input tensor is of format [nx,ny,nz,3,3]
+    result = np.zeros_like(inputtensor[:,:,:,0,:])
+    result[:,:,:,0] = numdiv3d(inputtensor[:,:,:,0,:])
+    result[:,:,:,1] = numdiv3d(inputtensor[:,:,:,1,:])
+    result[:,:,:,2] = numdiv3d(inputtensor[:,:,:,2,:])
+    return result
+
 def numcrossproduct(inputvector1, inputvector2):
     # assumes inputvectors are of shape [nx,ny,3]
     # in fact nothing special here
     # Output array is of format [nx,ny,3]
+    return np.cross(inputvector1,inputvector2)
+
+def numcrossproduct3d(inputvector1, inputvector2):
+    # assumes inputvectors are of shape [nx,ny,nz,3]
+    # in fact nothing special here
+    # Output array is of format [nx,ny,nz,3]
     return np.cross(inputvector1,inputvector2)
 
 def numcurl(inputarray):
@@ -142,6 +225,15 @@ def numcurl(inputarray):
     curl[:,:,2] = jac[:,:,1,0]-jac[:,:,0,1]
     return curl
 
+def numcurl3d(inputarray):
+    # Assumes input array is of format [nx,ny,nz,3]
+    jac = numjacobian3d(inputarray)
+    # Output array is of format [nx,ny,3]
+    curl = np.zeros(inputarray.shape)
+    curl[:,:,:,0] = jac[:,:,:,2,1]-jac[:,:,:,1,2]
+    curl[:,:,:,1] = jac[:,:,:,0,2]-jac[:,:,:,2,0]
+    curl[:,:,:,2] = jac[:,:,:,1,0]-jac[:,:,:,0,1]
+    return curl
 
 def vanleer(left, cent, right):
     # "vanLeer" limiter as in Vlasiator
