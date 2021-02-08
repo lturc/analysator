@@ -487,6 +487,19 @@ def vec_MagneticTensionForce(inputarray):
     # Output array is of format [nx,ny,3]
     return tensforce
 
+def vec_MagneticTensionForce3d(inputarray):
+    # Assumes input array is of format [nx,ny,nz,3] with content B
+    mu0 = 1.25663706144e-6
+    jac = numjacobian3d(inputarray)
+    nx, ny, nz = inputarray[:,:,0].shape
+    print('nx',nx,'ny',ny,'nz',nz)
+    tensforce = np.zeros([nx,ny,nz,3])
+    tensforce[:,:,:,0] = (1./mu0) * (inputarray[:,:,:,0]*jac[:,:,:,0,0] + inputarray[:,:,:,1]*jac[:,:,:,0,1] + inputarray[:,:,:,2]*jac[:,:,:,0,2])
+    tensforce[:,:,:,1] = (1./mu0) * (inputarray[:,:,:,0]*jac[:,:,:,1,0] + inputarray[:,:,:,1]*jac[:,:,:,1,1] + inputarray[:,:,:,2]*jac[:,:,:,1,2])
+    tensforce[:,:,:,2] = (1./mu0) * (inputarray[:,:,:,0]*jac[:,:,:,2,0] + inputarray[:,:,:,1]*jac[:,:,:,2,1] + inputarray[:,:,:,2]*jac[:,:,:,2,2])
+    # Output array is of format [nx,ny,nz,3]
+    return tensforce
+
 def vec_ThermalPressureForce(inputarray):
     # assumes Thermal Pressure of shape [nx,ny]
     return (-1.)*numgradscalar(inputarray)
@@ -689,6 +702,13 @@ def expr_Btension(pass_maps, requestvariables=False):
     Bmap = TransposeVectorArray(pass_maps['B']) # Magnetic field
     MagTensionForce = vec_MagneticTensionForce(Bmap)
     return np.swapaxes(MagTensionForce, 0,1)
+
+def expr_Btension3d(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['fg_b','3d']
+    Bmap = pass_maps['fg_b'] # With passing of 3d maps on, no need to swap axis orders
+    MagTensionForce = vec_MagneticTensionForce3d(Bmap)
+    return MagTensionForce
 
 # No expr_Btension_aniso as it's all in the perpendicular component
 
